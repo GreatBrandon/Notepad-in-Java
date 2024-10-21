@@ -27,3 +27,16 @@ https://docs.oracle.com/javase/tutorial/uiswing/
 https://www.javatpoint.com/java-swing
 
 I hope you enjoy!
+
+Code checker fork added by Brandon built on top of original project by OliwierJ
+
+Extra functionality includes:
+ - Parentheses checker
+ - Semicolon checker
+ - Quotes checker
+ - Basic syntax checker
+ - Postfix expression checker
+ - Comments detector
+ - GUI changes and extra buttons
+
+(Project still work in progress, expect bugs :) )
