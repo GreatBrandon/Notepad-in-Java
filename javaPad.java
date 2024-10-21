@@ -8,7 +8,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 
-public class javaPad extends WindowAdapter implements ActionListener
+public class javaPad extends WindowAdapter implements ActionListener 
 {
     // declaring static variables
     static int fsize = 20;
@@ -20,10 +20,15 @@ public class javaPad extends WindowAdapter implements ActionListener
     static JButton button2;
     static File thisFile;
     static JFrame frame;
-    static JMenuItem cut,copy,paste,selectAll,newfile,open,save,saveAs,credits, popupCut, popupCopy,popupPaste,popupSelect; 
-    static JCheckBoxMenuItem wordWrap, statusBar;
-    static JLabel test,text2;
+    static JMenuItem cut,copy,paste,selectAll,newfile,open,save,saveAs,credits, popupCut, popupCopy,popupPaste,popupSelect, checkCode, popupCheckCode; 
+    static JCheckBoxMenuItem wordWrap, statusBar, postfixEnabled, popupPostfixEnabled;
+    static JLabel test,text2, codeLabel;
     static JDialog creditsDialog;
+    static Stack<Character> s;
+    static Stack<Integer> s2;
+    static int errorCount, lineNum;
+    static String errorMessages;
+    static boolean usePostfix = false; 
 
     @SuppressWarnings({ "unchecked", "rawtypes"})
 
@@ -70,19 +75,29 @@ public class javaPad extends WindowAdapter implements ActionListener
         popupCut=new JMenuItem("Cut");    
         popupCopy=new JMenuItem("Copy");    
         popupPaste=new JMenuItem("Paste");   
-        popupSelect=new JMenuItem("Select All");  
+        popupSelect=new JMenuItem("Select All"); 
+        checkCode = new JMenuItem("Check code");
+        popupCheckCode = new JMenuItem("Check code");
+        postfixEnabled = new JCheckBoxMenuItem("Enable postfix checking");
+        popupPostfixEnabled = new JCheckBoxMenuItem("Enable postfix checking");
+        postfixEnabled.setState(false);
+        popupPostfixEnabled.setState(false);
         
         // add to edit menu
         edit.add(cut);
         edit.add(copy);
         edit.add(paste);
         edit.add(selectAll);
+        edit.add(checkCode);
+        edit.add(postfixEnabled);
         
         // add buttton checker
         cut.addActionListener(main);    
         copy.addActionListener(main);    
         paste.addActionListener(main);    
         selectAll.addActionListener(main); 
+        checkCode.addActionListener(main);
+        postfixEnabled.addActionListener(main);
         
         // help menu
         credits = new JMenuItem("Credits");
@@ -92,7 +107,7 @@ public class javaPad extends WindowAdapter implements ActionListener
         // credits box
         creditsDialog = new JDialog(frame, "Credits");
         JLabel creditJLabel = new JLabel();
-        creditJLabel.setText("    NotePad in Java: Made by OliwierJ 2024");
+        creditJLabel.setText("    NotePad in Java: Made by OliwierJ 2024\nCode and postfix checker added by Brandon");
         creditsDialog.setSize(280,130);
         creditsDialog.add(creditJLabel);
         creditsDialog.setResizable(false);
@@ -152,10 +167,14 @@ public class javaPad extends WindowAdapter implements ActionListener
         popupmenu.add(popupPaste); 
         popupmenu.addSeparator(); 
         popupmenu.add(popupSelect);        
+        popupmenu.add(popupCheckCode);
+        popupmenu.add(popupPostfixEnabled);
         popupCut.addActionListener(main);    
         popupCopy.addActionListener(main);    
         popupPaste.addActionListener(main);    
         popupSelect.addActionListener(main);   
+        popupCheckCode.addActionListener(main);
+        popupPostfixEnabled.addActionListener(main);
         
         // set up place to write text
         textArea = new JTextArea();
@@ -268,9 +287,11 @@ public class javaPad extends WindowAdapter implements ActionListener
         // status bar down at the bottom
         JPanel thestatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
         test = new JLabel("| Characters: 0");
+        codeLabel = new JLabel("| ");
         
         thestatusBar.add(text2);
         thestatusBar.add(test);
+        thestatusBar.add(codeLabel);
         
         // check if status bar is on or not
         statusBar.addItemListener(new ItemListener() {
@@ -351,7 +372,19 @@ public class javaPad extends WindowAdapter implements ActionListener
         textArea.selectAll(); 
         if(e.getSource()==credits) 
         creditsDialog.setVisible(true);
-        
+        if(e.getSource()==checkCode || e.getSource()==popupCheckCode)
+        checkCode();
+        if(e.getSource()==postfixEnabled || e.getSource()==popupPostfixEnabled) {
+            if (usePostfix) {
+                postfixEnabled.setState(false);
+                popupPostfixEnabled.setState(false);
+                usePostfix = false;
+            } else {
+                postfixEnabled.setState(true);
+                popupPostfixEnabled.setState(true);
+                usePostfix = true;
+            }
+        }
     }
     // opens a scanner object to read through a selected file
     // returns a string of the file
@@ -467,4 +500,197 @@ public class javaPad extends WindowAdapter implements ActionListener
         }
         return -1;  // default case to prevent accidental closes if trying to save
     }
-}
+
+    public static void checkCode() {
+        s = new Stack<>();
+        s2 = new Stack<>();
+        errorCount = 0;
+        lineNum = 1;
+        errorMessages = "";
+        boolean ignoreNext = false;
+        boolean ignoreLine = false;
+        boolean inQuotes = false;
+        boolean expressionMode = false;
+        char previousChar = '\n';
+        String infix = "";
+        String text = textArea.getText()+"\n";
+        for (char c: text.toCharArray()) {
+            if (!ignoreNext && !ignoreLine && !inQuotes && !expressionMode) {
+                if (c == '(' || c == '[' || c == '{' || c == '<') {
+                    s.push(c);
+                    s2.push(lineNum);
+                } else if (c == ')') {
+                    checkChar('(');
+                } else if (c == ']') {
+                    checkChar('[');
+                } else if (c == '}') {
+                    checkChar('{');
+                } else if (c == '>' && previousChar != '-') {
+                    checkChar('<');
+                } else if (c == '\"' || c == '\'') {
+                    if (!s.isEmpty() && s.peek() == c){
+                        checkChar(c);
+                    } else {
+                        s.push(c);
+                        s2.push(lineNum);
+                        inQuotes = true;
+                    }
+                } else if (c == '\n') {
+                    if (previousChar != ';' && previousChar != '{' && previousChar != '}' && previousChar != '\n') {
+                        errorMessages += "Missing ; on line "+lineNum+"\n";
+                        errorCount++;
+                    }
+                    lineNum++;
+                } else if (c == '\\') {
+                    ignoreNext = true;
+                } else if (c == ' ') {
+                    continue;
+                } else if (c == '/' && previousChar == '/') {
+                    ignoreLine = true;
+                } else if (c == ';' && (previousChar == '{' || previousChar == '}')) {
+                    errorMessages += "Invalid ; on line "+lineNum+"\n";
+                    errorCount++;
+                } else if (c == '=' && usePostfix) {
+                    expressionMode = true;
+                    infix = "";
+                }
+                previousChar = c;
+            } else if (ignoreLine) {
+                if (c == '\n') {
+                    ignoreLine = false;
+                    lineNum++;
+                    previousChar = c;
+                }
+            } else if (inQuotes && !ignoreNext) {
+                if (c == '\\') {
+                    ignoreNext = true;
+                } else if (c == '\"' || c == '\'') {
+                    checkChar(c);
+                    inQuotes = false;
+                }
+            } else if (expressionMode) {
+                if (c == ';') {
+                    if (!postFix(infix)) {
+                        errorMessages += "Invalid expression in line "+lineNum;
+                        errorCount++;
+                    } 
+                    expressionMode = false;
+                    previousChar = c;
+                } else if (c == '\n') {
+                    expressionMode = false;
+                    errorMessages += "Missing ; on line "+lineNum;
+                    errorCount++;
+                    lineNum++;
+                    previousChar = c;
+                } else if (c != ' ') {
+                    infix += c;
+                }
+            } else {
+                ignoreNext = false;
+            }
+        }
+        String title = "Code checker ";
+        if (usePostfix) {
+            title += "(postfix checking enabled)";
+        } else {
+            title += "(postfix checking disabled)";
+        }
+        if (s.isEmpty() && errorCount == 0) {
+            codeLabel.setText("| No syntax errors detected");
+            JOptionPane.showMessageDialog(frame, "No syntax errors detected!", title, JOptionPane.PLAIN_MESSAGE);
+        } else {
+            while (!s.isEmpty()) {
+                errorCount++;
+                errorMessages += s.pop()+" closing bracket missing on line "+s2.pop()+"\n";
+            }
+            codeLabel.setText("| "+errorCount+" syntax errors detected");
+            JOptionPane.showMessageDialog(frame, errorCount+" syntax errors detected!\n"+errorMessages, title, JOptionPane.PLAIN_MESSAGE);
+        }
+    }
+    public static void checkChar(char check) {
+        if (s.isEmpty() || s.peek() != check) {
+            errorMessages += check+" expected on line "+lineNum+"\n";
+            errorCount++;
+        } else {
+            s.pop();
+            s2.pop();
+        }
+    }
+    public static boolean postFix(String infix) {
+        Stack<Character> p = new Stack<>();
+        String postfix = "";
+        for (char c : infix.toCharArray()) {
+            if (Character.isDigit(c)) {
+                postfix += c;
+            } else if ( c == '*' || c == '/') {
+                p.push(c);
+            } else if ( c == '+' || c == '-') {
+                postfix += " ";
+                while (!p.isEmpty() && (p.peek() == '*' || p.peek() == '/')) {
+                    postfix += p.pop()+" ";
+                }
+                p.push(c);
+            } else if ( c == '(') {
+                p.push(c);
+            } else if ( c == ')') {
+                postfix += " ";
+                boolean found = false;
+                while (!p.isEmpty()) {
+                    if (p.peek() == '(') {
+                        found = true;
+                        p.pop();
+                        break;
+                    }
+                    postfix += p.pop()+" ";
+                }
+                if (!found) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        while (!p.isEmpty()) {
+            postfix += p.pop();
+        }
+        System.out.println(postfix);
+        Stack<Double> d = new Stack<>();
+        String currentNo = "";
+        for (char c : postfix.toCharArray()) {
+            if (Character.isDigit(c)) {
+                currentNo += c;
+            } else if (c == '+' || c == '-' || c == '*' || c == '/') {
+                try {
+                    double d1 = d.pop();
+                    double d2 = d.pop();
+                    switch (c) {
+                        case '+': d.push(d2+d1); break;
+                        case '-': d.push(d2-d1); break;
+                        case '*': d.push(d2*d1); break;
+                        case '/': 
+                            if (d1 != 0) {
+                                d.push(d2*d1);
+                            } else {
+                                errorMessages += "Division by 0 not allowed, ";
+                                return false;
+                            }
+                        default: break;
+                    }
+                } catch (Exception e) {
+                    System.out.println(e);
+                    return false;
+                }
+            } else if (c == ' ' && currentNo != "") {
+                d.push(Double.parseDouble(currentNo));
+                currentNo = "";
+            }
+            System.out.println(d.toString());
+        }
+        d.pop();
+        if (d.isEmpty()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+} // TODO: test = (10+20)*(1+5)-2; check are spaces being added at end of postfix expression
