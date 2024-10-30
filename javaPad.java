@@ -216,7 +216,7 @@ public class javaPad extends WindowAdapter implements ActionListener
         textArea.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 if(e.getButton()==MouseEvent.BUTTON3) {
-                    popupmenu.show(frame , MouseInfo.getPointerInfo().getLocation().x, MouseInfo.getPointerInfo().getLocation().y); 
+                    popupmenu.show(e.getComponent(), e.getX(), e.getY());
                 } 
             } 
         });
