@@ -501,7 +501,7 @@ public class javaPad extends WindowAdapter implements ActionListener
         return -1;  // default case to prevent accidental closes if trying to save
     }
 
-    public static void checkCode() {
+    public static void checkCode() { // TODO: sometime in the future move this to Checker.java
         s = new Stack<>();
         s2 = new Stack<>();
         errorCount = 0;
@@ -570,10 +570,11 @@ public class javaPad extends WindowAdapter implements ActionListener
                 }
             } else if (expressionMode) {
                 if (c == ';') {
-                    if (!postFix(infix)) {
+                    if (Checker.evaluatePostfix(Checker.toPostfix(infix)) == null) {
                         errorMessages += "Invalid expression in line "+lineNum;
                         errorCount++;
-                    } 
+                        System.out.println("postfix failed");
+                    }
                     expressionMode = false;
                     previousChar = c;
                 } else if (c == '\n') {
@@ -616,81 +617,5 @@ public class javaPad extends WindowAdapter implements ActionListener
             s2.pop();
         }
     }
-    public static boolean postFix(String infix) {
-        Stack<Character> p = new Stack<>();
-        String postfix = "";
-        for (char c : infix.toCharArray()) {
-            if (Character.isDigit(c)) {
-                postfix += c;
-            } else if ( c == '*' || c == '/') {
-                p.push(c);
-            } else if ( c == '+' || c == '-') {
-                postfix += " ";
-                while (!p.isEmpty() && (p.peek() == '*' || p.peek() == '/')) {
-                    postfix += p.pop()+" ";
-                }
-                p.push(c);
-            } else if ( c == '(') {
-                p.push(c);
-            } else if ( c == ')') {
-                postfix += " ";
-                boolean found = false;
-                while (!p.isEmpty()) {
-                    if (p.peek() == '(') {
-                        found = true;
-                        p.pop();
-                        break;
-                    }
-                    postfix += p.pop()+" ";
-                }
-                if (!found) {
-                    return false;
-                }
-            } else {
-                return false;
-            }
-        }
-        while (!p.isEmpty()) {
-            postfix += p.pop();
-        }
-        System.out.println(postfix);
-        Stack<Double> d = new Stack<>();
-        String currentNo = "";
-        for (char c : postfix.toCharArray()) {
-            if (Character.isDigit(c)) {
-                currentNo += c;
-            } else if (c == '+' || c == '-' || c == '*' || c == '/') {
-                try {
-                    double d1 = d.pop();
-                    double d2 = d.pop();
-                    switch (c) {
-                        case '+': d.push(d2+d1); break;
-                        case '-': d.push(d2-d1); break;
-                        case '*': d.push(d2*d1); break;
-                        case '/': 
-                            if (d1 != 0) {
-                                d.push(d2*d1);
-                            } else {
-                                errorMessages += "Division by 0 not allowed, ";
-                                return false;
-                            }
-                        default: break;
-                    }
-                } catch (Exception e) {
-                    System.out.println(e);
-                    return false;
-                }
-            } else if (c == ' ' && currentNo != "") {
-                d.push(Double.parseDouble(currentNo));
-                currentNo = "";
-            }
-            System.out.println(d.toString());
-        }
-        d.pop();
-        if (d.isEmpty()) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-} // TODO: test = (10+20)*(1+5)-2; check are spaces being added at end of postfix expression
+    
+}
